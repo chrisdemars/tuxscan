@@ -1,46 +1,55 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { parseQR } from '../utils/parseQR.js'
 
 export function useScanner({ onContact }) {
   const [scanning, setScanning] = useState(false)
   const [scanned, setScanned] = useState(false)
   const [error, setError] = useState(null)
+
+  // Refs avoid stale-closure issues inside the Scanner callback
+  const scannedRef = useRef(false)
   const lastRawRef = useRef(null)
   const lastTimeRef = useRef(0)
 
   function startScan() {
     setError(null)
+    scannedRef.current = false
     setScanned(false)
     setScanning(true)
   }
 
   function stopScan() {
-    setScanning(false)
+    scannedRef.current = false
     setScanned(false)
+    setScanning(false)
   }
 
-  function handleScan(results) {
-    if (scanned) return // already showing success, ignore until closed
+  const handleScan = useCallback((results) => {
+    // Guard via ref, not state — avoids stale closure
+    if (scannedRef.current) return
 
     const raw = Array.isArray(results) ? results[0]?.rawValue : results
     if (!raw) return
 
-    // Debounce: skip same code within 3 seconds
+    // Debounce: skip same raw value within 3 seconds
     const now = Date.now()
     if (raw === lastRawRef.current && now - lastTimeRef.current < 3000) return
     lastRawRef.current = raw
     lastTimeRef.current = now
 
     const contact = parseQR(raw)
-    if (contact) {
-      setScanned(true)
-      onContact(contact)
-      setTimeout(() => {
-        setScanning(false)
-        setScanned(false)
-      }, 1500)
-    }
-  }
+    if (!contact) return
+
+    scannedRef.current = true
+    setScanned(true)
+    onContact(contact)
+
+    setTimeout(() => {
+      scannedRef.current = false
+      setScanned(false)
+      setScanning(false)
+    }, 1500)
+  }, [onContact])
 
   function handleError(err) {
     console.error('Scanner error', err)

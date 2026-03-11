@@ -1,20 +1,24 @@
 /**
  * Parse a QR code string into a contact object.
- * Supports vCard, MECARD, JSON, and plain-text fallback.
- * @param {string} raw - Raw QR code string
- * @returns {{ name: string, title: string, email: string } | null}
+ * Tries vCard → MECARD → JSON → plain-text email extraction → raw fallback.
+ * Always returns a contact for any non-empty string.
+ * @param {string} raw
+ * @returns {{ name: string, title: string, email: string }}
  */
 export function parseQR(raw) {
   if (!raw || typeof raw !== 'string') return null
 
   const trimmed = raw.trim()
+  if (!trimmed) return null
 
   if (trimmed.toUpperCase().startsWith('BEGIN:VCARD')) return parseVCard(trimmed)
   if (trimmed.toUpperCase().startsWith('MECARD:')) return parseMecard(trimmed)
-  if (trimmed.startsWith('{')) return parseJSON(trimmed)
+  if (trimmed.startsWith('{')) {
+    const result = parseJSON(trimmed)
+    if (result) return result
+  }
 
-  // Plain-text fallback — capture whatever we can
-  return parsePlainText(trimmed)
+  return parseFallback(trimmed)
 }
 
 function parseVCard(raw) {
@@ -39,11 +43,10 @@ function parseVCard(raw) {
     }
   }
 
-  if (!name && !email) return null
-  return { name, title, email }
+  return { name: name || 'Unknown', title, email }
 }
 
-// MECARD:N:Last,First;EMAIL:email;ORG:org;TEL:phone;;
+// MECARD:N:Last,First;EMAIL:email;ORG:org;;
 function parseMecard(raw) {
   const body = raw.slice(raw.indexOf(':') + 1)
   const fields = {}
@@ -59,16 +62,14 @@ function parseMecard(raw) {
   let name = ''
   if (fields['N']) {
     const parts = fields['N'].split(',')
-    const last = parts[0] || ''
-    const first = parts[1] || ''
-    name = [first, last].filter(Boolean).join(' ')
+    name = [parts[1], parts[0]].filter(Boolean).join(' ')
   }
 
-  const title = fields['ORG'] || ''
-  const email = fields['EMAIL'] || ''
-
-  if (!name && !email) return null
-  return { name, title, email }
+  return {
+    name: name || 'Unknown',
+    title: fields['ORG'] || '',
+    email: fields['EMAIL'] || '',
+  }
 }
 
 function parseJSON(raw) {
@@ -78,24 +79,17 @@ function parseJSON(raw) {
     const title = obj.title || obj.jobTitle || obj.job_title || obj.position || obj.org || ''
     const email = obj.email || obj.emailAddress || obj.email_address || ''
     if (!name && !email) return null
-    return { name, title, email }
+    return { name: name || 'Unknown', title, email }
   } catch {
     return null
   }
 }
 
-// Last-resort: extract email via regex, use remaining text as name
-function parsePlainText(raw) {
+// Extract email if present; store remaining text or raw as name
+function parseFallback(raw) {
   const emailMatch = raw.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/)
   const email = emailMatch ? emailMatch[0] : ''
-
-  // Remove the email from the text and use what's left as a name hint
   const remainder = raw.replace(email, '').replace(/\s+/g, ' ').trim()
-  // Only use remainder as name if it looks like a name (not a URL or long blob)
-  const name = remainder.length > 0 && remainder.length < 60 && !remainder.includes('http')
-    ? remainder
-    : ''
-
-  if (!name && !email) return null
+  const name = remainder.length > 0 && remainder.length < 80 ? remainder : raw.slice(0, 80)
   return { name, title: '', email }
 }

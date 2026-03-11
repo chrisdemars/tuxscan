@@ -1,90 +1,50 @@
 import { useEffect, useRef, useState } from 'react'
-import jsQR from 'jsqr'
+import { BrowserQRCodeReader, NotFoundException } from '@zxing/library'
 
 export function QRScanner({ onScan, onError, onClose, scanned }) {
   const videoRef = useRef(null)
-  const canvasRef = useRef(null)
   const onScanRef = useRef(onScan)
   const onErrorRef = useRef(onError)
-  const activeRef = useRef(false)
-  const intervalRef = useRef(null)
+  const controlsRef = useRef(null)
   const [cameraReady, setCameraReady] = useState(false)
   const [cameraError, setCameraError] = useState(null)
+  const [debug, setDebug] = useState('Starting…')
 
-  // Keep callback refs current on every render — no stale closures
   useEffect(() => { onScanRef.current = onScan }, [onScan])
   useEffect(() => { onErrorRef.current = onError }, [onError])
 
   useEffect(() => {
-    activeRef.current = true
+    let active = true
+    const reader = new BrowserQRCodeReader()
 
-    function tick() {
-      if (!activeRef.current) return
-      const video = videoRef.current
-      const canvas = canvasRef.current
-      if (!video || !canvas) return
-      if (video.readyState < 2 || video.videoWidth === 0) return
-
-      // Scale down to 640 wide max — faster jsQR, same detection rate
-      const scale = Math.min(1, 640 / video.videoWidth)
-      const w = Math.floor(video.videoWidth * scale)
-      const h = Math.floor(video.videoHeight * scale)
-
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w
-        canvas.height = h
-      }
-
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(video, 0, 0, w, h)
-      const imageData = ctx.getImageData(0, 0, w, h)
-      const code = jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' })
-
-      if (code?.data) {
-        onScanRef.current([{ rawValue: code.data }])
-      }
-    }
-
-    async function startCamera() {
-      // Guard: camera API unavailable (non-HTTPS or very old browser)
+    async function start() {
       if (!navigator.mediaDevices?.getUserMedia) {
         setCameraError('Camera not supported. Please use Safari on iOS or Chrome on Android over HTTPS.')
         return
       }
 
       try {
-        // Try rear camera first, fall back to any camera
-        let stream
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' } },
-            audio: false,
-          })
-        } catch {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        const controls = await reader.decodeFromConstraints(
+          { video: { facingMode: { ideal: 'environment' } }, audio: false },
+          videoRef.current,
+          (result, err) => {
+            if (!active) return
+            if (result) {
+              setDebug(`DETECTED: ${result.getText().slice(0, 60)}`)
+              onScanRef.current([{ rawValue: result.getText() }])
+            } else if (err && !(err instanceof NotFoundException)) {
+              setDebug(`scan err: ${err.name ?? err.message}`)
+            }
+          }
+        )
+
+        controlsRef.current = controls
+        if (active) {
+          setCameraReady(true)
+          setDebug('ZXing active — point at badge QR code')
         }
-
-        if (!activeRef.current) {
-          stream.getTracks().forEach((t) => t.stop())
-          return
-        }
-
-        const video = videoRef.current
-        if (!video) return
-
-        video.srcObject = stream
-        video.playsInline = true
-        video.muted = true
-
-        await video.play().catch((err) => {
-          throw new Error('Video play failed: ' + err.message)
-        })
-
-        setCameraReady(true)
-        // Poll at ~15fps — reliable across all mobile browsers
-        intervalRef.current = setInterval(tick, 67)
       } catch (err) {
-        if (!activeRef.current) return
+        if (!active) return
         const msg =
           err.name === 'NotAllowedError'
             ? 'Camera permission denied. Please allow camera access in your browser settings.'
@@ -96,11 +56,12 @@ export function QRScanner({ onScan, onError, onClose, scanned }) {
       }
     }
 
-    startCamera()
+    start()
 
     return () => {
-      activeRef.current = false
-      clearInterval(intervalRef.current)
+      active = false
+      try { controlsRef.current?.stop() } catch { /* ignore */ }
+      // Clean up video srcObject in case ZXing left it set
       const video = videoRef.current
       if (video?.srcObject) {
         video.srcObject.getTracks().forEach((t) => t.stop())
@@ -126,22 +87,13 @@ export function QRScanner({ onScan, onError, onClose, scanned }) {
       </div>
 
       {/* Camera */}
-      <div className="flex-1 relative overflow-hidden bg-black">
+      <div className="flex-1 relative bg-black">
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
           playsInline
           muted
           autoPlay
-        />
-
-        {/*
-          Canvas must NOT be display:none — drawImage() silently produces blank
-          frames on some browsers when the canvas is hidden. Position off-screen.
-        */}
-        <canvas
-          ref={canvasRef}
-          style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}
         />
 
         {cameraError ? (
@@ -174,6 +126,13 @@ export function QRScanner({ onScan, onError, onClose, scanned }) {
               <span className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-indigo-400 rounded-bl-lg" />
               <span className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-indigo-400 rounded-br-lg" />
             </div>
+          </div>
+        )}
+
+        {/* Debug overlay */}
+        {!scanned && !cameraError && (
+          <div className="absolute bottom-2 left-2 right-2 bg-black/70 rounded px-2 py-1 pointer-events-none">
+            <p className="text-yellow-300 text-xs font-mono break-all">{debug}</p>
           </div>
         )}
       </div>

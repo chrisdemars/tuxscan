@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
+    "@zxing/library": "^0.21.3",
     "events": "^3.3.0",
     "jsqr": "^1.4.0",
     "papaparse": "^5.4.1",

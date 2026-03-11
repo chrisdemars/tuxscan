@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { db } from '../db/pouchdb.js'
+import { dbSaveContact, dbGetAllContacts, dbDeleteContact, dbContactExists } from '../db/pouchdb.js'
 
 const LS_KEY = 'tuxscan_contacts'
 
@@ -25,10 +25,9 @@ export function useContacts() {
 
   const loadContacts = useCallback(async () => {
     try {
-      const result = await db.allDocs({ include_docs: true, descending: true })
-      const docs = result.rows.map((r) => r.doc)
+      const docs = await dbGetAllContacts()
       setContacts(docs)
-      lsWrite(docs)
+      lsWrite(docs) // keep localStorage mirror in sync
     } catch (err) {
       console.error('PouchDB load failed, falling back to localStorage', err)
       setContacts(lsRead())
@@ -42,20 +41,18 @@ export function useContacts() {
   }, [loadContacts])
 
   async function addContact(contact) {
-    const duplicate = contacts.find(
-      (c) => c.email && c.email.toLowerCase() === contact.email?.toLowerCase()
-    )
-    if (duplicate) return { duplicate: true }
-
     try {
-      const scannedAt = new Date().toISOString()
-      await db.put({ _id: scannedAt, ...contact, scannedAt })
-      await loadContacts() // re-reads PouchDB and syncs localStorage
+      const exists = await dbContactExists(contact.email)
+      if (exists) return { duplicate: true }
+
+      await dbSaveContact(contact)
+      await loadContacts()
       return { success: true }
     } catch (err) {
       console.error('PouchDB write failed, writing to localStorage only', err)
+      // localStorage fallback so the scan is never lost
       const scannedAt = new Date().toISOString()
-      const newContact = { _id: scannedAt, ...contact, scannedAt }
+      const newContact = { _id: `contact_${scannedAt}`, ...contact, scannedAt }
       const updated = [newContact, ...contacts]
       setContacts(updated)
       lsWrite(updated)
@@ -65,7 +62,7 @@ export function useContacts() {
 
   async function deleteContact(contact) {
     try {
-      await db.remove(contact)
+      await dbDeleteContact(contact)
       await loadContacts()
     } catch (err) {
       console.error('PouchDB delete failed, removing from localStorage only', err)

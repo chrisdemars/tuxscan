@@ -1,0 +1,10 @@
+node_modules/
+.claude/
+dist/
+.env
+.env.local
+.DS_Store
+*.local
+
+# Local Netlify folder
+.netlify

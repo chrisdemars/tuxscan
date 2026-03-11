@@ -196,7 +196,6 @@ export function QRScanner({ onScan, onError, onClose, scanned }) {
           muted
           autoPlay
         />
-
         {cameraError ? (
           <div className="absolute inset-0 flex items-center justify-center p-8">
             <div className="bg-slate-800 rounded-2xl p-5 text-center">

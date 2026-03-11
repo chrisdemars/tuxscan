@@ -42,7 +42,7 @@ export function useScanner({ onContact }) {
 
     scannedRef.current = true
     setScanned(true)
-    onContact(contact)
+    onContact({ ...contact, rawQR: raw })
 
     setTimeout(() => {
       scannedRef.current = false

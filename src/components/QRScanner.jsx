@@ -1,11 +1,52 @@
 import { useEffect, useRef, useState } from 'react'
-import { BrowserQRCodeReader, NotFoundException } from '@zxing/library'
+import {
+  MultiFormatReader,
+  BinaryBitmap,
+  HybridBinarizer,
+  RGBLuminanceSource,
+  DecodeHintType,
+  NotFoundException,
+} from '@zxing/library'
+
+const hints = new Map([[DecodeHintType.TRY_HARDER, true]])
+const zxingReader = new MultiFormatReader()
+zxingReader.setHints(hints)
+
+// Convert RGBA Uint8ClampedArray (from getImageData) to grayscale Uint8ClampedArray
+// RGBLuminanceSource requires 1-byte-per-pixel luminance, NOT 4-byte RGBA
+function rgbaToLuminance(rgba, w, h) {
+  const out = new Uint8ClampedArray(w * h)
+  for (let i = 0; i < w * h; i++) {
+    const r = rgba[i * 4]
+    const g = rgba[i * 4 + 1]
+    const b = rgba[i * 4 + 2]
+    out[i] = ((r * 306) + (g * 601) + (b * 117)) >>> 10
+  }
+  return out
+}
+
+// Cross-browser getUserMedia (handles webkit prefix in older Chrome/Safari)
+function getUserMedia(constraints) {
+  if (navigator.mediaDevices?.getUserMedia) {
+    return navigator.mediaDevices.getUserMedia(constraints)
+  }
+  const legacy = navigator.getUserMedia ||
+    navigator.webkitGetUserMedia ||
+    navigator.mozGetUserMedia ||
+    navigator.msGetUserMedia
+  if (legacy) {
+    return new Promise((resolve, reject) => legacy.call(navigator, constraints, resolve, reject))
+  }
+  return Promise.reject(new Error('Camera not supported'))
+}
 
 export function QRScanner({ onScan, onError, onClose, scanned }) {
   const videoRef = useRef(null)
+  const canvas = useRef(document.createElement('canvas'))
   const onScanRef = useRef(onScan)
   const onErrorRef = useRef(onError)
-  const controlsRef = useRef(null)
+  const activeRef = useRef(false)
+  const rafRef = useRef(null)
   const [cameraReady, setCameraReady] = useState(false)
   const [cameraError, setCameraError] = useState(null)
   const [debug, setDebug] = useState('Starting…')
@@ -14,54 +55,113 @@ export function QRScanner({ onScan, onError, onClose, scanned }) {
   useEffect(() => { onErrorRef.current = onError }, [onError])
 
   useEffect(() => {
-    let active = true
-    const reader = new BrowserQRCodeReader()
+    activeRef.current = true
+    let frameCount = 0
 
-    async function start() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setCameraError('Camera not supported. Please use Safari on iOS or Chrome on Android over HTTPS.')
+    function tick() {
+      if (!activeRef.current) return
+
+      const video = videoRef.current
+      if (!video || video.readyState < 2 || video.videoWidth === 0) {
+        rafRef.current = requestAnimationFrame(tick)
         return
       }
 
-      try {
-        const controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' } }, audio: false },
-          videoRef.current,
-          (result, err) => {
-            if (!active) return
-            if (result) {
-              setDebug(`DETECTED: ${result.getText().slice(0, 60)}`)
-              onScanRef.current([{ rawValue: result.getText() }])
-            } else if (err && !(err instanceof NotFoundException)) {
-              setDebug(`scan err: ${err.name ?? err.message}`)
-            }
-          }
-        )
+      const cvs = canvas.current
+      const w = video.videoWidth
+      const h = video.videoHeight
 
-        controlsRef.current = controls
-        if (active) {
-          setCameraReady(true)
-          setDebug('ZXing active — point at badge QR code')
+      if (cvs.width !== w || cvs.height !== h) {
+        cvs.width = w
+        cvs.height = h
+      }
+
+      const ctx = cvs.getContext('2d')
+      ctx.drawImage(video, 0, 0, w, h)
+      const imageData = ctx.getImageData(0, 0, w, h)
+
+      frameCount++
+      if (frameCount % 30 === 0) {
+        const cx = Math.floor(w / 2)
+        const cy = Math.floor(h / 2)
+        const i = (cy * w + cx) * 4
+        const d = imageData.data
+        setDebug(`frames=${frameCount} ${w}x${h} center=${d[i]},${d[i+1]},${d[i+2]}`)
+      }
+
+      try {
+        // Convert RGBA → grayscale for ZXing
+        const luminance = rgbaToLuminance(imageData.data, w, h)
+        const src = new RGBLuminanceSource(luminance, w, h)
+        const bitmap = new BinaryBitmap(new HybridBinarizer(src))
+        const result = zxingReader.decode(bitmap)
+        const raw = result.getText()
+        setDebug(`DETECTED: ${raw.slice(0, 60)}`)
+        onScanRef.current([{ rawValue: raw }])
+        return // stop loop
+      } catch (e) {
+        if (!(e instanceof NotFoundException)) {
+          setDebug(`err: ${e.name}: ${e.message}`)
         }
+      }
+
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
+    async function startCamera() {
+      try {
+        let stream
+        // Try rear camera first, then fall back to any camera
+        try {
+          stream = await getUserMedia({
+            video: { facingMode: { ideal: 'environment' } },
+            audio: false,
+          })
+        } catch {
+          stream = await getUserMedia({ video: true, audio: false })
+        }
+
+        if (!activeRef.current) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+
+        const video = videoRef.current
+        if (!video) return
+
+        video.setAttribute('playsinline', '')
+        video.setAttribute('webkit-playsinline', '')
+        video.srcObject = stream
+        video.muted = true
+
+        await new Promise((resolve, reject) => {
+          video.onloadedmetadata = resolve
+          video.onerror = reject
+          setTimeout(resolve, 3000) // safety timeout
+        })
+        await video.play()
+
+        setCameraReady(true)
+        setDebug('Scanning… point at QR code')
+        rafRef.current = requestAnimationFrame(tick)
       } catch (err) {
-        if (!active) return
+        if (!activeRef.current) return
         const msg =
           err.name === 'NotAllowedError'
             ? 'Camera permission denied. Please allow camera access in your browser settings.'
             : err.name === 'NotFoundError'
             ? 'No camera found on this device.'
-            : 'Camera error: ' + err.message
+            : 'Camera not supported. Please use Safari on iOS or Chrome on Android over HTTPS.'
         setCameraError(msg)
         onErrorRef.current(err)
       }
     }
 
-    start()
+    startCamera()
 
     return () => {
-      active = false
-      try { controlsRef.current?.stop() } catch { /* ignore */ }
-      // Clean up video srcObject in case ZXing left it set
+      activeRef.current = false
+      cancelAnimationFrame(rafRef.current)
       const video = videoRef.current
       if (video?.srcObject) {
         video.srcObject.getTracks().forEach((t) => t.stop())
@@ -92,6 +192,7 @@ export function QRScanner({ onScan, onError, onClose, scanned }) {
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
           playsInline
+          webkit-playsinline=""
           muted
           autoPlay
         />

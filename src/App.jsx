@@ -25,7 +25,7 @@ export default function App() {
     }
   }
 
-  const { scanning, error: scanError, startScan, stopScan, handleScan, handleError } = useScanner({
+  const { scanning, scanned, error: scanError, startScan, stopScan, handleScan, handleError } = useScanner({
     onContact: handleContact,
   })
 
@@ -79,7 +79,7 @@ export default function App() {
 
       {/* QR scanner overlay */}
       {scanning && (
-        <QRScanner onScan={handleScan} onError={handleError} onClose={stopScan} />
+        <QRScanner onScan={handleScan} onError={handleError} onClose={stopScan} scanned={scanned} />
       )}
 
       {/* Export modal */}

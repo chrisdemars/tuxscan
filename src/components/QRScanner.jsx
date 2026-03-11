@@ -186,22 +186,16 @@ export function QRScanner({ onScan, onError, onClose, scanned }) {
         </button>
       </div>
 
-      {/*
-        Video element must exist and be playing for drawImage() to capture frames,
-        but it does not need to be visible. Positioned off-screen via fixed so no
-        parent overflow:hidden can clip it.
-      */}
-      <video
-        ref={videoRef}
-        style={{ position: 'fixed', top: '-9999px', left: '-9999px' }}
-        playsInline
-        webkit-playsinline=""
-        muted
-        autoPlay
-      />
-
-      {/* Camera UI — dark background + targeting box, no video preview */}
-      <div className="flex-1 relative bg-slate-950">
+      {/* Camera */}
+      <div className="flex-1 relative bg-black">
+        <video
+          ref={videoRef}
+          className="absolute inset-0 w-full h-full object-cover"
+          playsInline
+          webkit-playsinline=""
+          muted
+          autoPlay
+        />
         {cameraError ? (
           <div className="absolute inset-0 flex items-center justify-center p-8">
             <div className="bg-slate-800 rounded-2xl p-5 text-center">

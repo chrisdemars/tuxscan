@@ -11,8 +11,8 @@ specified email address. Must work seamlessly on iPhone (Safari) and Android (Ch
 ## Tech Stack
 - **Framework:** React 18 + Vite
 - **PWA:** vite-plugin-pwa (service worker, offline support, installable)
-- **QR Scanning:** @yudiel/react-qr-scanner (camera-based, mobile-optimized)
-- **Database:** PouchDB (offline-first document database, persists to IndexedDB)
+- **QR Scanning:** jsQR — pure JavaScript QR decoder, no WASM, no CDN dependency. Camera access via `getUserMedia`, frames drawn to a hidden canvas and decoded on each `requestAnimationFrame` tick. Replaced `@yudiel/react-qr-scanner` which silently failed because its `barcode-detector` polyfill fetched ZXing WASM from a remote CDN at runtime.
+- **Database:** PouchDB (offline-first document database, persists to IndexedDB) + localStorage mirror as fallback
 - **CSV Export:** papaparse (parse/unparse CSV data)
 - **Email:** EmailJS (client-side email with CSV attachment — no backend needed)
 - **Styling:** Tailwind CSS (mobile-first, utility-based)
@@ -58,11 +58,13 @@ tuxscan/
 ### 1. QR Code Scanning
 - Large "Scan Code" button is the primary UI element
 - Tapping opens a full-screen camera overlay
-- Uses rear camera by default on mobile
-- On successful scan, parses QR payload for: `name`, `title`, `email`
-- Handles both vCard format and plain JSON QR payloads
-- Shows success feedback after each scan (toast or brief animation)
-- Prevents duplicate entries (check by email before inserting)
+- Uses rear camera by default on mobile (`facingMode: 'environment'`)
+- Auto-captures continuously — no button press needed once camera is open
+- On successful scan, shows "Badge Scanned!" green checkmark overlay for 1.5s then auto-closes
+- Debounced: same QR code ignored within 3 seconds to prevent duplicate fires
+- Parses QR payload via `parseQR`: vCard → MECARD → JSON → plain-text email extraction → raw fallback (any QR code is captured)
+- Prevents duplicate contacts (checked by email before inserting)
+- Camera stream properly torn down on close via `getTracks().stop()`
 
 ### 2. Contact List
 - Displays all scanned contacts in reverse chronological order
@@ -129,18 +131,19 @@ tuxscan/
 ---
 
 ## Current Build Status
-- [ ] Project scaffolded (Vite + React)
-- [ ] vite-plugin-pwa configured
-- [ ] Tailwind CSS configured
-- [ ] PouchDB instance set up
-- [ ] QR scanner component built
-- [ ] Contact list + PouchDB CRUD working
-- [ ] CSV export working
-- [ ] EmailJS integration working
-- [ ] PWA manifest + icons added
+- [x] Project scaffolded (Vite + React)
+- [x] vite-plugin-pwa configured
+- [x] Tailwind CSS configured
+- [x] PouchDB instance set up + localStorage mirror
+- [x] QR scanner component built (jsQR + getUserMedia)
+- [x] Contact list + PouchDB CRUD working
+- [x] CSV export working
+- [x] EmailJS integration working (requires .env credentials)
+- [ ] PWA manifest + icons added (icons directory empty — needs PNG files)
 - [ ] Tested on iOS Safari
 - [ ] Tested on Android Chrome
-- [ ] Production build verified
+- [x] Production build verified
+- [x] Deployed to Netlify (https://tuxscan.netlify.app)
 
 ---
 

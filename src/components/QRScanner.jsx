@@ -46,11 +46,23 @@ export function QRScanner({ onScan, onError, onClose, scanned }) {
     }
 
     async function startCamera() {
+      // Guard: camera API unavailable (non-HTTPS or very old browser)
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError('Camera not supported. Please use Safari on iOS or Chrome on Android over HTTPS.')
+        return
+      }
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-          audio: false,
-        })
+        // Try rear camera first, fall back to any camera
+        let stream
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } },
+            audio: false,
+          })
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        }
 
         if (!activeRef.current) {
           stream.getTracks().forEach((t) => t.stop())

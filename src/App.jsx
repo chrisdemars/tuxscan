@@ -30,7 +30,7 @@ export default function App() {
   })
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col">
+    <div className="min-h-screen-safe bg-slate-900 text-white flex flex-col">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-4 border-b border-slate-800">
         <div>
@@ -73,7 +73,7 @@ export default function App() {
       </main>
 
       {/* Sticky scan button */}
-      <div className="px-4 py-4 pb-safe border-t border-slate-800 bg-slate-900">
+      <div className="px-4 pt-4 border-t border-slate-800 bg-slate-900" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
         <ScanButton onPress={startScan} />
       </div>
 

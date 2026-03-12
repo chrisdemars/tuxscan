@@ -31,9 +31,12 @@ export default function App() {
   })
 
   return (
-    <div className="min-h-screen-safe bg-slate-900 text-white flex flex-col">
+    <div className="flex-1 flex flex-col bg-slate-900 text-white overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-4 border-b border-slate-800">
+      <header
+        className="flex items-center justify-between px-4 pb-4 border-b border-slate-800 bg-slate-900"
+        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+      >
         <div>
           <h1 className="text-white font-bold text-xl tracking-tight">TuxScan</h1>
           {!loading && (

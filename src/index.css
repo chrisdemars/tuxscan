@@ -5,8 +5,15 @@
 /* Prevent iOS overscroll/bounce on the main app shell */
 html,
 body {
+  height: 100%;
+  background-color: #0f172a; /* slate-900 — matches app bg, hides any subpixel gap */
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
-  /* Prevent text size adjustment on orientation change */
   -webkit-text-size-adjust: 100%;
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }

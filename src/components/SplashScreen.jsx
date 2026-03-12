@@ -5,6 +5,13 @@ export function SplashScreen({ onDone }) {
   const [imgReady, setImgReady] = useState(false)
 
   useEffect(() => {
+    // Preload image in JS — fires instantly if already cached via <link rel="preload">
+    const img = new Image()
+    img.onload = () => setImgReady(true)
+    img.src = '/icons/icon-512.png'
+  }, [])
+
+  useEffect(() => {
     const showTimer = setTimeout(() => setFading(true), 2000)
     const doneTimer = setTimeout(() => onDone(), 2600)
     return () => {
@@ -15,21 +22,24 @@ export function SplashScreen({ onDone }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900"
       style={{
         transition: 'opacity 600ms ease',
         opacity: fading ? 0 : 1,
         pointerEvents: fading ? 'none' : 'auto',
       }}
     >
-      <img
-        src="/icons/icon-512.png"
-        alt="TuxScan"
-        width="192"
-        height="192"
-        onLoad={() => setImgReady(true)}
-        style={{ opacity: imgReady ? 1 : 0 }}
-        className="w-48 h-48"
+      <div
+        style={{
+          width: 192,
+          height: 192,
+          flexShrink: 0,
+          opacity: imgReady ? 1 : 0,
+          backgroundImage: imgReady ? 'url(/icons/icon-512.png)' : 'none',
+          backgroundSize: 'contain',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+        }}
       />
     </div>
   )

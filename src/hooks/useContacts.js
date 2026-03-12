@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { dbSaveContact, dbGetAllContacts, dbDeleteContact, dbContactExists } from '../db/pouchdb.js'
+import { dbSaveContact, dbGetAllContacts, dbDeleteContact, dbContactExists, dbClearAllContacts } from '../db/pouchdb.js'
 
 const LS_KEY = 'tuxscan_contacts'
 
@@ -72,5 +72,17 @@ export function useContacts() {
     }
   }
 
-  return { contacts, loading, addContact, deleteContact }
+  async function clearContacts() {
+    try {
+      await dbClearAllContacts()
+      setContacts([])
+      lsWrite([])
+    } catch (err) {
+      console.error('PouchDB clear failed, clearing localStorage only', err)
+      setContacts([])
+      lsWrite([])
+    }
+  }
+
+  return { contacts, loading, addContact, deleteContact, clearContacts }
 }

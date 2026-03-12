@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react'
 
+// Inline base64 icon — zero network latency, renders at full size instantly
+import iconUrl from '/icons/icon-512.png?url'
+
+// Kick off decode before the component even mounts
+const decoded = new Promise((resolve) => {
+  const img = new Image()
+  img.onload = resolve
+  img.onerror = resolve
+  img.src = iconUrl
+})
+
 export function SplashScreen({ onDone }) {
   const [fading, setFading] = useState(false)
-  const [imgReady, setImgReady] = useState(false)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    // Preload image in JS — fires instantly if already cached via <link rel="preload">
-    const img = new Image()
-    img.onload = () => setImgReady(true)
-    img.src = '/icons/icon-512.png'
+    decoded.then(() => setReady(true))
   }, [])
 
   useEffect(() => {
@@ -29,18 +37,15 @@ export function SplashScreen({ onDone }) {
         pointerEvents: fading ? 'none' : 'auto',
       }}
     >
-      <div
-        style={{
-          width: 192,
-          height: 192,
-          flexShrink: 0,
-          opacity: imgReady ? 1 : 0,
-          backgroundImage: imgReady ? 'url(/icons/icon-512.png)' : 'none',
-          backgroundSize: 'contain',
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center',
-        }}
-      />
+      {ready && (
+        <img
+          src={iconUrl}
+          alt="TuxScan"
+          width="192"
+          height="192"
+          style={{ display: 'block', width: 192, height: 192 }}
+        />
+      )}
     </div>
   )
 }

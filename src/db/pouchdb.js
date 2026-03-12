@@ -61,3 +61,15 @@ export async function dbContactExists(email) {
   const contacts = await dbGetAllContacts()
   return contacts.some((c) => c.email?.toLowerCase() === email.toLowerCase())
 }
+
+/**
+ * Delete every contact document from PouchDB.
+ * Used to reset after an event ends.
+ *
+ * @returns {Promise<void>}
+ */
+export async function dbClearAllContacts() {
+  const contacts = await dbGetAllContacts()
+  const deleteDocs = contacts.map((c) => ({ ...c, _deleted: true }))
+  await db.bulkDocs(deleteDocs)
+}

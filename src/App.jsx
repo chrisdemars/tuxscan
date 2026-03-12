@@ -7,8 +7,9 @@ import { ContactList } from './components/ContactList.jsx'
 import { ExportModal } from './components/ExportModal.jsx'
 
 export default function App() {
-  const { contacts, loading, addContact, deleteContact } = useContacts()
+  const { contacts, loading, addContact, deleteContact, clearContacts } = useContacts()
   const [showExport, setShowExport] = useState(false)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [toast, setToast] = useState(null) // { message, type }
 
   function showToast(message, type = 'success') {
@@ -42,15 +43,26 @@ export default function App() {
           )}
         </div>
         {contacts.length > 0 && (
-          <button
-            onClick={() => setShowExport(true)}
-            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white text-sm font-medium rounded-xl px-3 py-2 transition-colors touch-manipulation"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              className="flex items-center gap-2 bg-red-900/50 hover:bg-red-800 active:bg-red-700 text-red-300 text-sm font-medium rounded-xl px-3 py-2 transition-colors touch-manipulation"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Clear
+            </button>
+            <button
+              onClick={() => setShowExport(true)}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white text-sm font-medium rounded-xl px-3 py-2 transition-colors touch-manipulation"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export
+            </button>
+          </div>
         )}
       </header>
 
@@ -85,6 +97,36 @@ export default function App() {
       {/* Export modal */}
       {showExport && (
         <ExportModal contacts={contacts} onClose={() => setShowExport(false)} />
+      )}
+
+      {/* Clear all confirmation modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <h2 className="text-white font-bold text-lg mb-2">Clear all scans?</h2>
+            <p className="text-slate-400 text-sm mb-6">
+              This will permanently delete all {contacts.length} scanned contact{contacts.length !== 1 ? 's' : ''}. Export first if you need to keep them.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white text-sm font-medium rounded-xl px-4 py-3 transition-colors touch-manipulation"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  await clearContacts()
+                  setShowClearConfirm(false)
+                  showToast('All scans cleared')
+                }}
+                className="flex-1 bg-red-700 hover:bg-red-600 active:bg-red-500 text-white text-sm font-medium rounded-xl px-4 py-3 transition-colors touch-manipulation"
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast */}

@@ -1,12 +1,16 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useContacts } from './hooks/useContacts.js'
 import { useScanner } from './hooks/useScanner.js'
 import { ScanButton } from './components/ScanButton.jsx'
 import { QRScanner } from './components/QRScanner.jsx'
 import { ContactList } from './components/ContactList.jsx'
 import { ExportModal } from './components/ExportModal.jsx'
+import { SplashScreen } from './components/SplashScreen.jsx'
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true)
+  const handleSplashDone = useCallback(() => setShowSplash(false), [])
+
   const { contacts, loading, addContact, deleteContact, clearContacts } = useContacts()
   const [showExport, setShowExport] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -32,6 +36,7 @@ export default function App() {
 
   return (
     <div className="flex-1 flex flex-col bg-slate-900 text-white overflow-hidden">
+      {showSplash && <SplashScreen onDone={handleSplashDone} />}
       {/* Header */}
       <header
         className="flex items-center justify-between px-4 pb-4 border-b border-slate-800 bg-slate-900"

@@ -15,7 +15,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/*.png'],
+      includeAssets: ['icons/*.png', 'splash/*.png'],
       manifest: {
         name: 'TuxScan',
         short_name: 'TuxScan',

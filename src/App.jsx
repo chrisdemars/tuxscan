@@ -31,7 +31,7 @@ export default function App() {
   })
 
   return (
-    <div className="h-screen-safe bg-slate-900 text-white flex flex-col">
+    <div className="flex-1 flex flex-col bg-slate-900 text-white overflow-hidden">
       {/* Header */}
       <header
         className="flex items-center justify-between px-4 pb-4 border-b border-slate-800 bg-slate-900"
